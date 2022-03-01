@@ -7,20 +7,22 @@ A Prometheus exporter for [AWS Trusted Advisor](https://aws.amazon.com/premiumsu
 Trusted Advisor [exposes metrics in Cloudwatch](https://docs.aws.amazon.com/awssupport/latest/user/cloudwatch-metrics-ta.html), so one could be tempted to use the [Cloudwatch exporter](https://github.com/prometheus/cloudwatch_exporter) to get Trusted Advisor metrics.
 
 However, this approach suffers from various issues:
-- Trusted Advisor metrics only publishes metrics when it refreshes its checks, which creates large gaps in the metrics
+- Trusted Advisor only publishes metrics when it refreshes its checks, which creates large gaps in the metrics
 - In turn, this makes the Cloudwatch exporter highly unreliable - with Cloudwatch being full of holes, the metrics exported to Prometheus will be inconsistent as well
-- You can _partly_ work around that issue by configuring the Cloudwatch exporter to allow old metrics, but scrapes then become extremely long (120+ seconds) and the whole setup will start being expensive, as Cloudwatch isn't cheap
+- You can _partly_ work around that issue by configuring the Cloudwatch exporter to request old data with `range_seconds`, but scrapes then become extremely long (120+ seconds) and the whole setup will start being expensive, as Cloudwatch isn't cheap
 - A minor issue in comparison - Trusted Advisor only publishes its metrics in us-east-1, so your Cloudwatch exporter needs to be configured for that region
 
-Instead, this exporter retrieves data directly from the [Trusted Advisor API](https://docs.aws.amazon.com/sdk-for-go/api/service/support/) in order to always get up-to-date and correct data.
+Instead, this exporter retrieves data directly from the [Support API](https://docs.aws.amazon.com/sdk-for-go/api/service/support/) in order to always get up-to-date and correct data. This means you will need a [support plan of Business or above](https://aws.amazon.com/premiumsupport/plans/) to use this exporter.
 
-Unlike Cloudwatch, this API is also free (well, "free" - it's included in the cost of your support contract).
+Finally, unlike Cloudwatch, this API is also free. Well, "free" in the sense that it's included in the cost of your support contract. 🙂
 
-## Authentication
+## Credentials and permissions
 
-`prometheus-trusted-advisor-exporter` uses the standard AWS authentication methods provided by the AWS SDK for Go, so you should be able to authenticate using the standard environment variables, shared credentials file, IAM role for EC2, etc.
+`prometheus-trusted-advisor-exporter` uses the standard AWS authentication methods provided by the AWS SDK for Go, so you should be able to authenticate using the standard environment variables, shared credentials file, IAM roles for EC2, etc. See [Specifying Credentials](https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/configuring-sdk.html#specifying-credentials) for more details.
 
-See [Specifying Credentials](https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/configuring-sdk.html#specifying-credentials) for more details.
+It requires the following permissions:
+- `support:DescribeTrustedAdvisorChecks`
+- `support:DescribeTrustedAdvisorCheckResult`
 
 ## Configuration
 
@@ -38,6 +40,13 @@ go build
 ./prometheus-trusted-advisor-exporter
 ```
 
+Or use the Docker container:
+
+```bash
+docker build . -t prometheus-trusted-advisor-exporter
+docker run -p 2112:2112 -it prometheus-trusted-advisor-exporter
+```
+
 ## Exposed metrics
 
 `prometheus-trusted-advisor-exporter` exports a single gauge, `aws_trusted_advisor_check`, with classification labels:
@@ -51,3 +60,5 @@ aws_trusted_advisor_check{category="cost_optimizing",checkid="51fC20e7I2",name="
 aws_trusted_advisor_check{category="security",checkid="DqdJqYeRm5",name="IAM Access Key Rotation",status="error"} 36
 (...)
 ```
+
+All Trusted Advisor checks are exported for every scrape, regardless of their status. They will get a status of "ok" (green), "warning" (yellow), "error" (red), or "not_available" if the check failed to refresh.
