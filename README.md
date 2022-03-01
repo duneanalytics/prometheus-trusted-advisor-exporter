@@ -47,6 +47,12 @@ docker build . -t prometheus-trusted-advisor-exporter
 docker run -p 2112:2112 -it prometheus-trusted-advisor-exporter
 ```
 
+A pre-built version of this container [is available on the ECR public gallery](https://gallery.ecr.aws/r0t8x2e9/prometheus_trusted_advisor_exporter):
+
+```bash
+docker run -p 2112:2112 -it public.ecr.aws/r0t8x2e9/prometheus_trusted_advisor_exporter
+```
+
 ## Exposed metrics
 
 `prometheus-trusted-advisor-exporter` exposes a single gauge at `/metrics`:
