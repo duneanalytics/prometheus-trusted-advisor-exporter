@@ -14,7 +14,7 @@ However, this approach suffers from various issues:
 
 Instead, this exporter retrieves data directly from the [Support API](https://docs.aws.amazon.com/sdk-for-go/api/service/support/) in order to always get up-to-date and correct data. This means you will need a [support plan of Business or above](https://aws.amazon.com/premiumsupport/plans/) to use this exporter.
 
-Finally, unlike Cloudwatch, this API is also free. Well, "free" in the sense that it's included in the cost of your support contract. 🙂
+Finally, unlike Cloudwatch, this API is free. Well, "free" in the sense that it's included in the cost of your support contract. 🙂
 
 ## Credentials and permissions
 
@@ -26,7 +26,7 @@ It requires the following permissions:
 
 ## Configuration
 
-`prometheus-trusted-advisor-exporter` supports the following environment variables for configuration:
+The exporter is configured via the following environment variables:
 
 | Variable         | Description   | Default value |
 |------------------| ------------- |---------------|
@@ -49,7 +49,8 @@ docker run -p 2112:2112 -it prometheus-trusted-advisor-exporter
 
 ## Exposed metrics
 
-`prometheus-trusted-advisor-exporter` exports a single gauge, `aws_trusted_advisor_check`, with classification labels:
+`prometheus-trusted-advisor-exporter` exposes a single gauge at `/metrics`:
+
 ```
 # HELP aws_trusted_advisor_check AWS Trusted Advisor check result
 # TYPE aws_trusted_advisor_check gauge
