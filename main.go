@@ -113,8 +113,8 @@ func main() {
 	// ... and create a vector of Trusted Advisor gauges
 	taGaugeVec := prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "trusted_advisor_check",
-			Help: "Trusted Advisor check result",
+			Name: "aws_trusted_advisor_check",
+			Help: "AWS Trusted Advisor check result",
 		},
 		[]string{
 			"checkid",
