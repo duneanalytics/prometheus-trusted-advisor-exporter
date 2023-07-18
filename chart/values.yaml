@@ -45,7 +45,12 @@ serviceMonitor:
   enabled: true
   interval: 30s
   scrapeTimeout: 10s
-
+  additionalLabels: {}
+  # you can add additional labels to the ServiceMonitor
+  # to be picked up by Prometheus
+  # additionalLabels:
+  #   release: prometheus
+  
 ingress:
   enabled: false
   className: ""
