@@ -4,6 +4,14 @@
 
 replicaCount: 1
 
+# in seconds, defaulted in the chart to 10 minutes because something
+# has changed in the API, you can not query the same check more than
+# once every 8 minutes or so, in the past it returned something else
+# probably a 202, but currently it returns a 4xx error, so we have
+# to wait a bit longer to query query the checks and avoid the error.
+
+refreshPeriod: 600
+
 image:
   repository: public.ecr.aws/r0t8x2e9/prometheus_trusted_advisor_exporter
   # repository: ghcr.io/r0t8x2e9/prometheus-trusted-advisor-exporter
