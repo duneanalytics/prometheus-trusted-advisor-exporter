@@ -63,12 +63,21 @@ func refreshSpecificCheck(svc *support.Support, checkId string, checkName string
 
 	// And set the current value
 	result := *resp.Result
-	taGaugeVec.WithLabelValues(
-		checkId,
-		checkName,
-		checkCategory,
-		*result.Status,
-	).Add(float64(len(result.FlaggedResources)))
+	if result.ResourcesSummary != nil && result.ResourcesSummary.ResourcesFlagged != nil {
+		taGaugeVec.WithLabelValues(
+			checkId,
+			checkName,
+			checkCategory,
+			*result.Status,
+		).Add(float64(*result.ResourcesSummary.ResourcesFlagged))
+	} else {
+		taGaugeVec.WithLabelValues(
+			checkId,
+			checkName,
+			checkCategory,
+			*result.Status,
+		).Add(float64(len(result.FlaggedResources)))
+	}
 }
 
 func refreshChecksPeriodically(svc *support.Support, taGaugeVec *prometheus.GaugeVec, period int) {
