@@ -48,7 +48,8 @@ func refreshSpecificCheck(svc *support.Support, checkId string, checkName string
 	resp, err := svc.DescribeTrustedAdvisorCheckResult(&params)
 
 	if err != nil {
-		log.Fatalf("cannot describe trusted advisor check result: %w", err)
+		log.Printf("cannot describe trusted advisor check result: %v", err)
+		return
 	}
 
 	// Clean up potential outdated gauge values
@@ -63,12 +64,22 @@ func refreshSpecificCheck(svc *support.Support, checkId string, checkName string
 
 	// And set the current value
 	result := *resp.Result
-	taGaugeVec.WithLabelValues(
-		checkId,
-		checkName,
-		checkCategory,
-		*result.Status,
-	).Add(float64(len(result.FlaggedResources)))
+	// log.Printf("%s", result)
+	if result.ResourcesSummary != nil && result.ResourcesSummary.ResourcesFlagged != nil {
+		taGaugeVec.WithLabelValues(
+			checkId,
+			checkName,
+			checkCategory,
+			*result.Status,
+		).Add(float64(*result.ResourcesSummary.ResourcesFlagged))
+	} else {
+		taGaugeVec.WithLabelValues(
+			checkId,
+			checkName,
+			checkCategory,
+			*result.Status,
+		).Add(float64(len(result.FlaggedResources)))
+	}
 }
 
 func refreshChecksPeriodically(svc *support.Support, taGaugeVec *prometheus.GaugeVec, period int) {
