@@ -32,6 +32,7 @@ The exporter is configured via the following environment variables:
 |------------------| ------------- |---------------|
 | `LISTEN_ADDR`    | Address and port the exporter will listen to  | `:2112`       |
 | `REFRESH_PERIOD` | How often to refresh all checks and their values, in seconds  | `300`         |
+| `CONCURRENCY`    | How many concurrent goroutines to use to refresh all checks and their values  | `10`         |
 
 ## Build and run
 

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -23,7 +24,13 @@ const Lang = "en"
 // Trusted Advisor supports the following statuses
 var Statuses = []string{"ok", "warning", "error", "not_available"}
 
-func refreshChecks(svc *support.Support, taGaugeVec *prometheus.GaugeVec) {
+type checkJob struct {
+	checkId       string
+	checkName     string
+	checkCategory string
+}
+
+func refreshChecks(svc *support.Support, taGaugeVec *prometheus.GaugeVec, concurrency int) {
 	log.Printf("refreshing trusted advisor checks and statuses")
 
 	// Get all checks...
@@ -34,10 +41,33 @@ func refreshChecks(svc *support.Support, taGaugeVec *prometheus.GaugeVec) {
 		log.Fatalf("cannot describe trusted advisor checks: %w", err)
 	}
 
-	log.Printf("refreshing %d checks", len(resp.Checks))
-	for _, check := range resp.Checks {
-		go refreshSpecificCheck(svc, *check.Id, *check.Name, *check.Category, taGaugeVec)
+	jobs := make(chan checkJob, len(resp.Checks))
+	var wg sync.WaitGroup
+
+	// Start workers
+	for i := 0; i < concurrency; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for job := range jobs {
+				refreshSpecificCheck(svc, job.checkId, job.checkName, job.checkCategory, taGaugeVec)
+			}
+		}()
 	}
+
+	// Send jobs
+	log.Printf("refreshing %d checks with %d workers", len(resp.Checks), concurrency)
+	for _, check := range resp.Checks {
+		jobs <- checkJob{
+			checkId:       *check.Id,
+			checkName:     *check.Name,
+			checkCategory: *check.Category,
+		}
+	}
+	close(jobs)
+
+	// Wait for all workers to complete
+	wg.Wait()
 }
 
 func refreshSpecificCheck(svc *support.Support, checkId string, checkName string, checkCategory string, taGaugeVec *prometheus.GaugeVec) {
@@ -71,10 +101,10 @@ func refreshSpecificCheck(svc *support.Support, checkId string, checkName string
 	).Add(float64(len(result.FlaggedResources)))
 }
 
-func refreshChecksPeriodically(svc *support.Support, taGaugeVec *prometheus.GaugeVec, period int) {
+func refreshChecksPeriodically(svc *support.Support, taGaugeVec *prometheus.GaugeVec, period int, concurrency int) {
 	ticker := time.NewTicker(time.Duration(period) * time.Second)
-	for _ = range ticker.C {
-		refreshChecks(svc, taGaugeVec)
+	for range ticker.C {
+		refreshChecks(svc, taGaugeVec, concurrency)
 	}
 }
 
@@ -95,11 +125,16 @@ func main() {
 	if err != nil {
 		log.Fatalf("cannot convert REFRESH_PERIOD to int: %w", err)
 	}
+	concurrencyStr := getEnv("CONCURRENCY", "10")
+	concurrency, err := strconv.Atoi(concurrencyStr)
+	if err != nil {
+		log.Fatalf("cannot convert CONCURRENCY to int: %w", err)
+	}
 
 	log.Printf("trusted advisor exporter starting up")
 	log.Printf("listening on %s", listenAddr)
 	log.Printf("refresh period %d seconds", refreshPeriod)
-
+	log.Printf("concurrency %d", concurrency)
 	// Set up AWS session based on shared config
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
 		SharedConfigState: session.SharedConfigEnable,
@@ -126,10 +161,10 @@ func main() {
 	registry.MustRegister(taGaugeVec)
 
 	// Populate our checks once at start-up time
-	refreshChecks(svc, taGaugeVec)
+	refreshChecks(svc, taGaugeVec, concurrency)
 
 	// And set up a periodic refresh
-	go refreshChecksPeriodically(svc, taGaugeVec, int(refreshPeriod))
+	go refreshChecksPeriodically(svc, taGaugeVec, int(refreshPeriod), concurrency)
 
 	// Finally, serve metrics on /metrics
 	http.Handle("/metrics", promhttp.HandlerFor(gatherer, promhttp.HandlerOpts{}))
