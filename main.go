@@ -50,6 +50,7 @@ func refreshChecks(svc *support.Support, taGaugeVec *prometheus.GaugeVec, concur
 		go func() {
 			defer wg.Done()
 			for job := range jobs {
+				log.Printf("worker %d refreshing check %s (id %s, category %s)", i, job.checkName, job.checkId, job.checkCategory)
 				refreshSpecificCheck(svc, job.checkId, job.checkName, job.checkCategory, taGaugeVec)
 			}
 		}()
@@ -75,10 +76,21 @@ func refreshSpecificCheck(svc *support.Support, checkId string, checkName string
 		CheckId:  aws.String(checkId),
 		Language: aws.String(Lang),
 	}
-	resp, err := svc.DescribeTrustedAdvisorCheckResult(&params)
+
+	var resp *support.DescribeTrustedAdvisorCheckResultOutput
+	var err error
+	for retries := 0; retries < 3; retries++ {
+		resp, err = svc.DescribeTrustedAdvisorCheckResult(&params)
+		if err == nil {
+			break
+		}
+		log.Printf("error refreshing check %s (id %s): %v (attempt %d/3)", checkName, checkId, err, retries+1)
+		time.Sleep(time.Second * time.Duration(retries+1))
+	}
 
 	if err != nil {
-		log.Fatalf("cannot describe trusted advisor check result: %w", err)
+		log.Printf("cannot describe trusted advisor check result: %v", err)
+		return
 	}
 
 	// Clean up potential outdated gauge values
@@ -123,12 +135,12 @@ func main() {
 	refreshPeriodStr := getEnv("REFRESH_PERIOD", "300")
 	refreshPeriod, err := strconv.Atoi(refreshPeriodStr)
 	if err != nil {
-		log.Fatalf("cannot convert REFRESH_PERIOD to int: %w", err)
+		log.Fatalf("cannot convert REFRESH_PERIOD to int: %v", err)
 	}
 	concurrencyStr := getEnv("CONCURRENCY", "10")
 	concurrency, err := strconv.Atoi(concurrencyStr)
 	if err != nil {
-		log.Fatalf("cannot convert CONCURRENCY to int: %w", err)
+		log.Fatalf("cannot convert CONCURRENCY to int: %v", err)
 	}
 
 	log.Printf("trusted advisor exporter starting up")
