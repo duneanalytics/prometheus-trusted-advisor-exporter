@@ -12,7 +12,7 @@ RUN go mod download
 ADD . .
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -ldflags="-w -s" .
 
-FROM gcr.io/distroless/static-debian11:latest
+FROM --platform=$BUILDPLATFORM gcr.io/distroless/static-debian12:latest
 
 COPY --from=builder /workspace/prometheus-trusted-advisor-exporter .
 
