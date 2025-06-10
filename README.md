@@ -54,7 +54,7 @@ A pre-built version of this container [is available on the ECR public gallery](h
 docker run -p 2112:2112 -it public.ecr.aws/r0t8x2e9/prometheus_trusted_advisor_exporter
 ```
 
-It is build by running:
+It is built by running:
 ```
 docker build --platform linux/arm64,linux/amd64 --push -t public.ecr.aws/r0t8x2e9/prometheus_trusted_advisor_exporter .
 ```
