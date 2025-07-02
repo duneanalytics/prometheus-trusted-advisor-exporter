@@ -81,6 +81,8 @@ func refreshSpecificCheck(ctx context.Context, svc *support.Client, checkId stri
 
 	var resp *support.DescribeTrustedAdvisorCheckResultOutput
 	var err error
+	var count float64
+
 	for retries := 0; retries < 3; retries++ {
 		resp, err = svc.DescribeTrustedAdvisorCheckResult(ctx, params)
 		if err == nil {
@@ -107,12 +109,25 @@ func refreshSpecificCheck(ctx context.Context, svc *support.Client, checkId stri
 
 	// And set the current value
 	result := *resp.Result
+    // Only count flagged resources when status indicates problems and are not suppressed
+	count = 0
+	if *result.Status == "warning" || *result.Status == "error" {
+		for _, resource := range result.FlaggedResources {
+        	if !*&resource.IsSuppressed && (*resource.Status == "error" || *resource.Status == "warning") {
+            	count++
+    	    }
+    	}
+	} else {
+		count = 0
+	}
+
+	log.Printf("Check %s (%s): status=%s, total_flagged=%d, non_suppressed=%f", checkName, checkId, *result.Status, len(result.FlaggedResources), count)
 	taGaugeVec.WithLabelValues(
 		checkId,
 		checkName,
 		checkCategory,
 		*result.Status,
-	).Add(float64(len(result.FlaggedResources)))
+	).Set(count)
 }
 
 func refreshChecksPeriodically(ctx context.Context, svc *support.Client, taGaugeVec *prometheus.GaugeVec, period int, concurrency int) {
